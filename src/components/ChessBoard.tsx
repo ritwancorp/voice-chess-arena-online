@@ -61,8 +61,24 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, l
     const ranks = "87654321";
     const col = files.indexOf(notation[0]);
     const row = ranks.indexOf(notation[1]);
-    if (col === -1 || row === -1) return null;
+    if (col === -1 || row === -1) return { row: -1, col: -1 };
     return { row, col };
+  };
+
+  const isPathClear = (fromRow: number, fromCol: number, toRow: number, toCol: number): boolean => {
+    const rowStep = toRow === fromRow ? 0 : (toRow > fromRow ? 1 : -1);
+    const colStep = toCol === fromCol ? 0 : (toCol > fromCol ? 1 : -1);
+
+    let currentRow = fromRow + rowStep;
+    let currentCol = fromCol + colStep;
+
+    while (currentRow !== toRow || currentCol !== toCol) {
+      if (board[currentRow][currentCol]) return false;
+      currentRow += rowStep;
+      currentCol += colStep;
+    }
+
+    return true;
   };
 
   const isValidPawnMove = (fromRow: number, fromCol: number, toRow: number, toCol: number, piece: ChessPiece): boolean => {
@@ -75,7 +91,7 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, l
       // One square forward
       if (toRow === fromRow + direction && !targetPiece) return true;
       // Two squares forward from starting position
-      if (fromRow === startRow && toRow === fromRow + 2 * direction && !targetPiece) return true;
+      if (fromRow === startRow && toRow === fromRow + 2 * direction && !targetPiece && !board[fromRow + direction][fromCol]) return true;
     }
     // Diagonal capture
     else if (Math.abs(fromCol - toCol) === 1 && toRow === fromRow + direction && targetPiece && targetPiece.color !== piece.color) {
@@ -86,66 +102,49 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, l
   };
 
   const isValidRookMove = (fromRow: number, fromCol: number, toRow: number, toCol: number): boolean => {
+    // Rook moves horizontally or vertically only
     if (fromRow !== toRow && fromCol !== toCol) return false;
-
-    // Check if path is clear
-    const rowStep = fromRow === toRow ? 0 : (toRow > fromRow ? 1 : -1);
-    const colStep = fromCol === toCol ? 0 : (toCol > fromCol ? 1 : -1);
-
-    let currentRow = fromRow + rowStep;
-    let currentCol = fromCol + colStep;
-
-    while (currentRow !== toRow || currentCol !== toCol) {
-      if (board[currentRow][currentCol]) return false;
-      currentRow += rowStep;
-      currentCol += colStep;
-    }
-
-    return true;
+    return isPathClear(fromRow, fromCol, toRow, toCol);
   };
 
   const isValidBishopMove = (fromRow: number, fromCol: number, toRow: number, toCol: number): boolean => {
+    // Bishop moves diagonally only
     if (Math.abs(fromRow - toRow) !== Math.abs(fromCol - toCol)) return false;
-
-    const rowStep = toRow > fromRow ? 1 : -1;
-    const colStep = toCol > fromCol ? 1 : -1;
-
-    let currentRow = fromRow + rowStep;
-    let currentCol = fromCol + colStep;
-
-    while (currentRow !== toRow || currentCol !== toCol) {
-      if (board[currentRow][currentCol]) return false;
-      currentRow += rowStep;
-      currentCol += colStep;
-    }
-
-    return true;
+    return isPathClear(fromRow, fromCol, toRow, toCol);
   };
 
   const isValidKnightMove = (fromRow: number, fromCol: number, toRow: number, toCol: number): boolean => {
     const rowDiff = Math.abs(fromRow - toRow);
     const colDiff = Math.abs(fromCol - toCol);
+    // Knight moves in L-shape: 2+1 or 1+2
     return (rowDiff === 2 && colDiff === 1) || (rowDiff === 1 && colDiff === 2);
   };
 
   const isValidQueenMove = (fromRow: number, fromCol: number, toRow: number, toCol: number): boolean => {
+    // Queen moves like rook or bishop
     return isValidRookMove(fromRow, fromCol, toRow, toCol) || isValidBishopMove(fromRow, fromCol, toRow, toCol);
   };
 
   const isValidKingMove = (fromRow: number, fromCol: number, toRow: number, toCol: number): boolean => {
     const rowDiff = Math.abs(fromRow - toRow);
     const colDiff = Math.abs(fromCol - toCol);
-    return rowDiff <= 1 && colDiff <= 1;
+    // King moves one square in any direction
+    return rowDiff <= 1 && colDiff <= 1 && (rowDiff > 0 || colDiff > 0);
   };
 
   const isValidMove = (fromRow: number, fromCol: number, toRow: number, toCol: number): boolean => {
-    const piece = board[fromRow][fromCol];
-    if (!piece || piece.color !== currentPlayer) return false;
-
     // Basic validation
     if (toRow < 0 || toRow > 7 || toCol < 0 || toCol > 7) return false;
+    if (fromRow === toRow && fromCol === toCol) return false;
+
+    const piece = board[fromRow][fromCol];
+    if (!piece) return false;
     
+    // Can only move your own pieces
+    if (piece.color !== currentPlayer) return false;
+
     const targetPiece = board[toRow][toCol];
+    // Cannot capture your own pieces
     if (targetPiece && targetPiece.color === piece.color) return false;
 
     // Piece-specific movement validation
@@ -184,10 +183,8 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, l
   const processVoiceCommand = (command: string) => {
     if (!gameStarted) return;
 
-    // Parse different voice command formats
     const trimmedCommand = command.toLowerCase().trim();
     
-    // Format: "e4" or "e2 to e4" or "move e2 e4"
     let fromSquare: string | null = null;
     let toSquare: string | null = null;
 
@@ -264,6 +261,17 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, l
 
       if (isValidMove(fromRow, fromCol, row, col)) {
         executeMove(fromRow, fromCol, row, col);
+      } else {
+        // If invalid move, try to select the clicked piece instead
+        const piece = board[row][col];
+        if (piece && piece.color === currentPlayer) {
+          setSelectedSquare({ row, col });
+          setValidMoves(calculateValidMoves(row, col));
+        } else {
+          // Clear selection if clicking on invalid square
+          setSelectedSquare(null);
+          setValidMoves([]);
+        }
       }
     } else {
       // Select a piece
