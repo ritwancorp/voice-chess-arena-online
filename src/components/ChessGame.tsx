@@ -25,11 +25,12 @@ export const ChessGame = () => {
   const [moveHistory, setMoveHistory] = useState<ChessMove[]>([]);
   const [currentPlayer, setCurrentPlayer] = useState<"white" | "black">("white");
   const [gameStarted, setGameStarted] = useState(false);
+  const [lastVoiceCommand, setLastVoiceCommand] = useState<string>("");
   const { toast } = useToast();
 
   const handleVoiceMove = (move: string) => {
     console.log("Voice move detected:", move);
-    // This will be handled by the chess board component
+    setLastVoiceCommand(move);
     toast({
       title: "Voice Command",
       description: `Heard: "${move}"`,
@@ -128,6 +129,7 @@ export const ChessGame = () => {
                 onMove={handleMove}
                 gameStarted={gameStarted}
                 voiceCommand={isListening}
+                lastVoiceCommand={lastVoiceCommand}
               />
             </CardContent>
           </Card>
