@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { ChessMove } from "./ChessGame";
 
@@ -31,7 +30,7 @@ const initialBoard: (ChessPiece | null)[][] = [
   Array(8).fill(null),
   Array(8).fill(null),
   Array(8).fill(null),
-  Array(8).fill(null).map(() => ({ type: "pawn", color: "white", symbol: "♟︎" })),
+  Array(8).fill(null).map(() => ({ type: "pawn", color: "white", symbol: "♙" })),
   [
     { type: "rook", color: "white", symbol: "♖" },
     { type: "knight", color: "white", symbol: "♘" },
@@ -152,20 +151,30 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand }:
             <div
               key={`${rowIndex}-${colIndex}`}
               className={`
-                w-12 h-12 md:w-16 md:h-16 flex items-center justify-center cursor-pointer relative
-                transition-all duration-200 hover:brightness-110
+                w-14 h-14 md:w-20 md:h-20 flex items-center justify-center cursor-pointer relative
+                transition-all duration-200 hover:brightness-110 hover:scale-105
                 ${getSquareColor(rowIndex, colIndex)}
                 ${voiceCommand ? "ring-2 ring-green-400 ring-opacity-50" : ""}
               `}
               onClick={() => handleSquareClick(rowIndex, colIndex)}
             >
               {piece && (
-                <span className={`
-                  text-3xl md:text-5xl select-none font-bold drop-shadow-lg
-                  ${piece.color === "white" ? "text-white filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" : "text-black filter drop-shadow-[0_2px_4px_rgba(255,255,255,0.3)]"}
-                `}>
-                  {piece.symbol}
-                </span>
+                <div className="relative transform transition-transform duration-200 hover:scale-110">
+                  <span className={`
+                    text-4xl md:text-6xl select-none font-bold
+                    ${piece.color === "white" 
+                      ? "text-gray-100 drop-shadow-[0_3px_6px_rgba(0,0,0,0.9)] filter brightness-110" 
+                      : "text-gray-900 drop-shadow-[0_2px_4px_rgba(255,255,255,0.4)] filter brightness-90"
+                    }
+                    hover:drop-shadow-[0_4px_8px_rgba(0,0,0,0.6)]
+                  `}>
+                    {piece.symbol}
+                  </span>
+                  <div className={`
+                    absolute inset-0 rounded-full transition-opacity duration-200
+                    ${isSquareSelected(rowIndex, colIndex) ? 'bg-blue-400 opacity-20' : 'opacity-0'}
+                  `} />
+                </div>
               )}
             </div>
           ))
