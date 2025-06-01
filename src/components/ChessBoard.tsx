@@ -31,7 +31,7 @@ const initialBoard: (ChessPiece | null)[][] = [
   Array(8).fill(null),
   Array(8).fill(null),
   Array(8).fill(null),
-  Array(8).fill(null).map(() => ({ type: "pawn", color: "white", symbol: "♙" })),
+  Array(8).fill(null).map(() => ({ type: "pawn", color: "white", symbol: "♟︎" })),
   [
     { type: "rook", color: "white", symbol: "♖" },
     { type: "knight", color: "white", symbol: "♘" },
@@ -85,7 +85,7 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand }:
         // Make the move
         const newBoard = board.map(r => [...r]);
         const piece = newBoard[fromRow][fromCol];
-        newBoard[toRow][toCol] = piece;
+        newBoard[row][col] = piece;
         newBoard[fromRow][fromCol] = null;
         
         setBoard(newBoard);
@@ -152,7 +152,7 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand }:
             <div
               key={`${rowIndex}-${colIndex}`}
               className={`
-                w-12 h-12 md:w-16 md:h-16 flex items-center justify-center cursor-pointer
+                w-12 h-12 md:w-16 md:h-16 flex items-center justify-center cursor-pointer relative
                 transition-all duration-200 hover:brightness-110
                 ${getSquareColor(rowIndex, colIndex)}
                 ${voiceCommand ? "ring-2 ring-green-400 ring-opacity-50" : ""}
@@ -160,14 +160,13 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand }:
               onClick={() => handleSquareClick(rowIndex, colIndex)}
             >
               {piece && (
-                <span className="text-2xl md:text-4xl select-none">
+                <span className={`
+                  text-3xl md:text-5xl select-none font-bold drop-shadow-lg
+                  ${piece.color === "white" ? "text-white filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" : "text-black filter drop-shadow-[0_2px_4px_rgba(255,255,255,0.3)]"}
+                `}>
                   {piece.symbol}
                 </span>
               )}
-              {/* Square coordinates for debugging */}
-              <span className="absolute text-xs opacity-30 pointer-events-none">
-                {getSquareNotation(rowIndex, colIndex)}
-              </span>
             </div>
           ))
         )}
