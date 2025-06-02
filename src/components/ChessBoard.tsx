@@ -1,4 +1,6 @@
+
 import { useState, useEffect } from "react";
+import { Chess } from 'chess.js';
 import { ChessMove } from "./ChessGame";
 
 interface ChessBoardProps {
@@ -7,6 +9,7 @@ interface ChessBoardProps {
   gameStarted: boolean;
   voiceCommand: boolean;
   lastVoiceCommand?: string;
+  engineMove?: string;
 }
 
 interface ChessPiece {
@@ -15,37 +18,18 @@ interface ChessPiece {
   symbol: string;
 }
 
-const initialBoard: (ChessPiece | null)[][] = [
-  [
-    { type: "rook", color: "black", symbol: "♜" },
-    { type: "knight", color: "black", symbol: "♞" },
-    { type: "bishop", color: "black", symbol: "♝" },
-    { type: "queen", color: "black", symbol: "♛" },
-    { type: "king", color: "black", symbol: "♚" },
-    { type: "bishop", color: "black", symbol: "♝" },
-    { type: "knight", color: "black", symbol: "♞" },
-    { type: "rook", color: "black", symbol: "♜" },
-  ],
-  Array(8).fill(null).map(() => ({ type: "pawn", color: "black", symbol: "♟" })),
-  Array(8).fill(null),
-  Array(8).fill(null),
-  Array(8).fill(null),
-  Array(8).fill(null),
-  Array(8).fill(null).map(() => ({ type: "pawn", color: "white", symbol: "♙" })),
-  [
-    { type: "rook", color: "white", symbol: "♖" },
-    { type: "knight", color: "white", symbol: "♘" },
-    { type: "bishop", color: "white", symbol: "♗" },
-    { type: "queen", color: "white", symbol: "♕" },
-    { type: "king", color: "white", symbol: "♔" },
-    { type: "bishop", color: "white", symbol: "♗" },
-    { type: "knight", color: "white", symbol: "♘" },
-    { type: "rook", color: "white", symbol: "♖" },
-  ],
-];
+const pieceSymbols: { [key: string]: { white: string; black: string } } = {
+  'p': { white: '♙', black: '♟' },
+  'r': { white: '♖', black: '♜' },
+  'n': { white: '♘', black: '♞' },
+  'b': { white: '♗', black: '♝' },
+  'q': { white: '♕', black: '♛' },
+  'k': { white: '♔', black: '♚' }
+};
 
-export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, lastVoiceCommand }: ChessBoardProps) => {
-  const [board, setBoard] = useState<(ChessPiece | null)[][]>(initialBoard);
+export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, lastVoiceCommand, engineMove }: ChessBoardProps) => {
+  const [chess] = useState(new Chess());
+  const [board, setBoard] = useState<(ChessPiece | null)[][]>([]);
   const [selectedSquare, setSelectedSquare] = useState<{ row: number; col: number } | null>(null);
   const [validMoves, setValidMoves] = useState<{ row: number; col: number }[]>([]);
 
@@ -61,189 +45,158 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, l
     const ranks = "87654321";
     const col = files.indexOf(notation[0]);
     const row = ranks.indexOf(notation[1]);
-    if (col === -1 || row === -1) return { row: -1, col: -1 };
+    if (col === -1 || row === -1) return null;
     return { row, col };
   };
 
-  const isPathClear = (fromRow: number, fromCol: number, toRow: number, toCol: number): boolean => {
-    const rowStep = toRow === fromRow ? 0 : (toRow > fromRow ? 1 : -1);
-    const colStep = toCol === fromCol ? 0 : (toCol > fromCol ? 1 : -1);
-
-    let currentRow = fromRow + rowStep;
-    let currentCol = fromCol + colStep;
-
-    while (currentRow !== toRow || currentCol !== toCol) {
-      if (board[currentRow][currentCol]) return false;
-      currentRow += rowStep;
-      currentCol += colStep;
-    }
-
-    return true;
-  };
-
-  const isValidPawnMove = (fromRow: number, fromCol: number, toRow: number, toCol: number, piece: ChessPiece): boolean => {
-    const direction = piece.color === "white" ? -1 : 1;
-    const startRow = piece.color === "white" ? 6 : 1;
-    const targetPiece = board[toRow][toCol];
-
-    // Moving forward
-    if (fromCol === toCol) {
-      // One square forward
-      if (toRow === fromRow + direction && !targetPiece) return true;
-      // Two squares forward from starting position
-      if (fromRow === startRow && toRow === fromRow + 2 * direction && !targetPiece && !board[fromRow + direction][fromCol]) return true;
-    }
-    // Diagonal capture
-    else if (Math.abs(fromCol - toCol) === 1 && toRow === fromRow + direction && targetPiece && targetPiece.color !== piece.color) {
-      return true;
-    }
-
-    return false;
-  };
-
-  const isValidRookMove = (fromRow: number, fromCol: number, toRow: number, toCol: number): boolean => {
-    // Rook moves horizontally or vertically only
-    if (fromRow !== toRow && fromCol !== toCol) return false;
-    return isPathClear(fromRow, fromCol, toRow, toCol);
-  };
-
-  const isValidBishopMove = (fromRow: number, fromCol: number, toRow: number, toCol: number): boolean => {
-    // Bishop moves diagonally only
-    if (Math.abs(fromRow - toRow) !== Math.abs(fromCol - toCol)) return false;
-    return isPathClear(fromRow, fromCol, toRow, toCol);
-  };
-
-  const isValidKnightMove = (fromRow: number, fromCol: number, toRow: number, toCol: number): boolean => {
-    const rowDiff = Math.abs(fromRow - toRow);
-    const colDiff = Math.abs(fromCol - toCol);
-    // Knight moves in L-shape: 2+1 or 1+2
-    return (rowDiff === 2 && colDiff === 1) || (rowDiff === 1 && colDiff === 2);
-  };
-
-  const isValidQueenMove = (fromRow: number, fromCol: number, toRow: number, toCol: number): boolean => {
-    // Queen moves like rook or bishop
-    return isValidRookMove(fromRow, fromCol, toRow, toCol) || isValidBishopMove(fromRow, fromCol, toRow, toCol);
-  };
-
-  const isValidKingMove = (fromRow: number, fromCol: number, toRow: number, toCol: number): boolean => {
-    const rowDiff = Math.abs(fromRow - toRow);
-    const colDiff = Math.abs(fromCol - toCol);
-    // King moves one square in any direction
-    return rowDiff <= 1 && colDiff <= 1 && (rowDiff > 0 || colDiff > 0);
-  };
-
-  const isValidMove = (fromRow: number, fromCol: number, toRow: number, toCol: number): boolean => {
-    // Basic validation
-    if (toRow < 0 || toRow > 7 || toCol < 0 || toCol > 7) return false;
-    if (fromRow === toRow && fromCol === toCol) return false;
-
-    const piece = board[fromRow][fromCol];
-    if (!piece) return false;
+  const updateBoardFromChess = () => {
+    const newBoard: (ChessPiece | null)[][] = Array(8).fill(null).map(() => Array(8).fill(null));
     
-    // Can only move your own pieces
-    if (piece.color !== currentPlayer) return false;
-
-    const targetPiece = board[toRow][toCol];
-    // Cannot capture your own pieces
-    if (targetPiece && targetPiece.color === piece.color) return false;
-
-    // Piece-specific movement validation
-    switch (piece.type) {
-      case "pawn":
-        return isValidPawnMove(fromRow, fromCol, toRow, toCol, piece);
-      case "rook":
-        return isValidRookMove(fromRow, fromCol, toRow, toCol);
-      case "bishop":
-        return isValidBishopMove(fromRow, fromCol, toRow, toCol);
-      case "knight":
-        return isValidKnightMove(fromRow, fromCol, toRow, toCol);
-      case "queen":
-        return isValidQueenMove(fromRow, fromCol, toRow, toCol);
-      case "king":
-        return isValidKingMove(fromRow, fromCol, toRow, toCol);
-      default:
-        return false;
-    }
-  };
-
-  const calculateValidMoves = (row: number, col: number): { row: number; col: number }[] => {
-    const moves: { row: number; col: number }[] = [];
-    
-    for (let toRow = 0; toRow < 8; toRow++) {
-      for (let toCol = 0; toCol < 8; toCol++) {
-        if (isValidMove(row, col, toRow, toCol)) {
-          moves.push({ row: toRow, col: toCol });
+    for (let row = 0; row < 8; row++) {
+      for (let col = 0; col < 8; col++) {
+        const square = getSquareNotation(row, col);
+        const piece = chess.get(square);
+        
+        if (piece) {
+          newBoard[row][col] = {
+            type: piece.type === 'p' ? 'pawn' : 
+                  piece.type === 'r' ? 'rook' :
+                  piece.type === 'n' ? 'knight' :
+                  piece.type === 'b' ? 'bishop' :
+                  piece.type === 'q' ? 'queen' : 'king',
+            color: piece.color === 'w' ? 'white' : 'black',
+            symbol: pieceSymbols[piece.type][piece.color === 'w' ? 'white' : 'black']
+          };
         }
       }
     }
     
-    return moves;
+    setBoard(newBoard);
+  };
+
+  const calculateValidMoves = (row: number, col: number): { row: number; col: number }[] => {
+    const square = getSquareNotation(row, col);
+    const moves = chess.moves({ square, verbose: true });
+    
+    return moves.map(move => {
+      const toPos = parseSquareNotation(move.to);
+      return toPos!;
+    }).filter(pos => pos !== null);
   };
 
   const processVoiceCommand = (command: string) => {
     if (!gameStarted) return;
 
+    console.log("Processing voice command:", command);
     const trimmedCommand = command.toLowerCase().trim();
     
-    let fromSquare: string | null = null;
-    let toSquare: string | null = null;
-
-    // Simple move like "e4"
-    if (/^[a-h][1-8]$/.test(trimmedCommand)) {
-      toSquare = trimmedCommand;
-      // Find a piece that can move to this square
-      for (let row = 0; row < 8; row++) {
-        for (let col = 0; col < 8; col++) {
-          const piece = board[row][col];
-          if (piece && piece.color === currentPlayer) {
-            const toPos = parseSquareNotation(toSquare);
-            if (toPos && isValidMove(row, col, toPos.row, toPos.col)) {
-              fromSquare = getSquareNotation(row, col);
-              break;
+    try {
+      let moveAttempted = false;
+      
+      // Try simple algebraic notation first (e4, Nf3, etc.)
+      if (/^[a-h][1-8]$/.test(trimmedCommand)) {
+        // Pawn move
+        const possibleMoves = chess.moves({ verbose: true }).filter(move => 
+          move.to === trimmedCommand && move.piece === 'p'
+        );
+        if (possibleMoves.length > 0) {
+          chess.move(possibleMoves[0]);
+          moveAttempted = true;
+        }
+      }
+      
+      // Try piece moves (knight c3, bishop f4, etc.)
+      else if (trimmedCommand.includes('knight') || trimmedCommand.includes('bishop') || 
+               trimmedCommand.includes('rook') || trimmedCommand.includes('queen') || 
+               trimmedCommand.includes('king')) {
+        const pieceMap: { [key: string]: string } = {
+          'knight': 'n', 'bishop': 'b', 'rook': 'r', 'queen': 'q', 'king': 'k'
+        };
+        
+        for (const [name, symbol] of Object.entries(pieceMap)) {
+          if (trimmedCommand.includes(name)) {
+            const squareMatch = trimmedCommand.match(/[a-h][1-8]/);
+            if (squareMatch) {
+              const targetSquare = squareMatch[0];
+              const possibleMoves = chess.moves({ verbose: true }).filter(move => 
+                move.to === targetSquare && move.piece === symbol
+              );
+              if (possibleMoves.length > 0) {
+                chess.move(possibleMoves[0]);
+                moveAttempted = true;
+                break;
+              }
             }
           }
         }
-        if (fromSquare) break;
       }
-    }
-    // Move from-to format like "e2 to e4" or "e2 e4"
-    else {
-      const matches = trimmedCommand.match(/([a-h][1-8]).*?([a-h][1-8])/);
-      if (matches) {
-        fromSquare = matches[1];
-        toSquare = matches[2];
-      }
-    }
-
-    if (fromSquare && toSquare) {
-      const fromPos = parseSquareNotation(fromSquare);
-      const toPos = parseSquareNotation(toSquare);
       
-      if (fromPos && toPos && isValidMove(fromPos.row, fromPos.col, toPos.row, toPos.col)) {
-        executeMove(fromPos.row, fromPos.col, toPos.row, toPos.col);
+      // Try full notation (e2 to e4, e2-e4, etc.)
+      else {
+        const matches = trimmedCommand.match(/([a-h][1-8]).*?([a-h][1-8])/);
+        if (matches) {
+          const from = matches[1];
+          const to = matches[2];
+          try {
+            chess.move({ from, to });
+            moveAttempted = true;
+          } catch (e) {
+            console.log("Invalid move:", from, "to", to);
+          }
+        }
       }
+      
+      if (moveAttempted) {
+        const history = chess.history({ verbose: true });
+        const lastMove = history[history.length - 1];
+        
+        updateBoardFromChess();
+        
+        const move: ChessMove = {
+          from: lastMove.from,
+          to: lastMove.to,
+          piece: lastMove.piece,
+          notation: lastMove.san,
+          timestamp: new Date()
+        };
+        
+        onMove(move);
+        setSelectedSquare(null);
+        setValidMoves([]);
+        console.log("Voice move executed:", move);
+      } else {
+        console.log("Could not execute voice command:", command);
+      }
+    } catch (error) {
+      console.error("Error processing voice command:", error);
     }
   };
 
   const executeMove = (fromRow: number, fromCol: number, toRow: number, toCol: number) => {
-    const newBoard = board.map(r => [...r]);
-    const piece = newBoard[fromRow][fromCol];
-    newBoard[toRow][toCol] = piece;
-    newBoard[fromRow][fromCol] = null;
+    const from = getSquareNotation(fromRow, fromCol);
+    const to = getSquareNotation(toRow, toCol);
     
-    setBoard(newBoard);
-    
-    const move: ChessMove = {
-      from: getSquareNotation(fromRow, fromCol),
-      to: getSquareNotation(toRow, toCol),
-      piece: piece?.type || "unknown",
-      notation: `${getSquareNotation(fromRow, fromCol)}-${getSquareNotation(toRow, toCol)}`,
-      timestamp: new Date()
-    };
-    
-    onMove(move);
-    setSelectedSquare(null);
-    setValidMoves([]);
+    try {
+      const moveResult = chess.move({ from, to });
+      
+      if (moveResult) {
+        updateBoardFromChess();
+        
+        const move: ChessMove = {
+          from: moveResult.from,
+          to: moveResult.to,
+          piece: moveResult.piece,
+          notation: moveResult.san,
+          timestamp: new Date()
+        };
+        
+        onMove(move);
+        setSelectedSquare(null);
+        setValidMoves([]);
+      }
+    } catch (error) {
+      console.error("Invalid move:", error);
+    }
   };
 
   const handleSquareClick = (row: number, col: number) => {
@@ -253,28 +206,13 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, l
       const { row: fromRow, col: fromCol } = selectedSquare;
       
       if (fromRow === row && fromCol === col) {
-        // Clicking the same square deselects it
         setSelectedSquare(null);
         setValidMoves([]);
         return;
       }
 
-      if (isValidMove(fromRow, fromCol, row, col)) {
-        executeMove(fromRow, fromCol, row, col);
-      } else {
-        // If invalid move, try to select the clicked piece instead
-        const piece = board[row][col];
-        if (piece && piece.color === currentPlayer) {
-          setSelectedSquare({ row, col });
-          setValidMoves(calculateValidMoves(row, col));
-        } else {
-          // Clear selection if clicking on invalid square
-          setSelectedSquare(null);
-          setValidMoves([]);
-        }
-      }
+      executeMove(fromRow, fromCol, row, col);
     } else {
-      // Select a piece
       const piece = board[row][col];
       if (piece && piece.color === currentPlayer) {
         setSelectedSquare({ row, col });
@@ -287,7 +225,32 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, l
     if (lastVoiceCommand && gameStarted) {
       processVoiceCommand(lastVoiceCommand);
     }
-  }, [lastVoiceCommand, gameStarted, board]);
+  }, [lastVoiceCommand, gameStarted]);
+
+  useEffect(() => {
+    if (engineMove && gameStarted) {
+      console.log("Executing engine move:", engineMove);
+      try {
+        chess.move(engineMove);
+        updateBoardFromChess();
+        
+        const history = chess.history({ verbose: true });
+        const lastMove = history[history.length - 1];
+        
+        const move: ChessMove = {
+          from: lastMove.from,
+          to: lastMove.to,
+          piece: lastMove.piece,
+          notation: lastMove.san,
+          timestamp: new Date()
+        };
+        
+        onMove(move);
+      } catch (error) {
+        console.error("Error executing engine move:", error);
+      }
+    }
+  }, [engineMove, gameStarted]);
 
   const isSquareSelected = (row: number, col: number): boolean => {
     return selectedSquare?.row === row && selectedSquare?.col === col;
@@ -314,11 +277,14 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, l
 
   useEffect(() => {
     if (!gameStarted) {
-      setBoard(initialBoard);
-      setSelectedSquare(null);
-      setValidMoves([]);
+      chess.reset();
     }
+    updateBoardFromChess();
   }, [gameStarted]);
+
+  useEffect(() => {
+    updateBoardFromChess();
+  }, []);
 
   return (
     <div className="flex justify-center">
@@ -340,8 +306,8 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, l
                   <span className={`
                     text-4xl md:text-6xl select-none font-bold
                     ${piece.color === "white" 
-                      ? "text-gray-100 drop-shadow-[0_3px_6px_rgba(0,0,0,0.9)] filter brightness-110" 
-                      : "text-gray-900 drop-shadow-[0_2px_4px_rgba(255,255,255,0.4)] filter brightness-90"
+                      ? "text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] filter brightness-110" 
+                      : "text-gray-800 drop-shadow-[0_1px_2px_rgba(255,255,255,0.3)] filter brightness-90"
                     }
                     hover:drop-shadow-[0_4px_8px_rgba(0,0,0,0.6)]
                   `}>

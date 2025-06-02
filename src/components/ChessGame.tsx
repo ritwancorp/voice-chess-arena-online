@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from "react";
+import { Chess } from 'chess.js';
 import { ChessBoard } from "./ChessBoard";
 import { VoiceControls } from "./VoiceControls";
 import { GameModeSelector } from "./GameModeSelector";
@@ -26,6 +27,8 @@ export const ChessGame = () => {
   const [currentPlayer, setCurrentPlayer] = useState<"white" | "black">("white");
   const [gameStarted, setGameStarted] = useState(false);
   const [lastVoiceCommand, setLastVoiceCommand] = useState<string>("");
+  const [engineMove, setEngineMove] = useState<string>("");
+  const [chess] = useState(new Chess());
   const { toast } = useToast();
 
   const handleVoiceMove = (move: string) => {
@@ -41,9 +44,8 @@ export const ChessGame = () => {
     setMoveHistory(prev => [...prev, move]);
     setCurrentPlayer(prev => prev === "white" ? "black" : "white");
     
-    // If playing against engine and it's engine's turn
+    // If playing against engine and it's engine's turn (black)
     if (gameMode === "engine" && currentPlayer === "white") {
-      // Simulate engine move after a delay
       setTimeout(() => {
         makeEngineMove();
       }, 1000);
@@ -51,41 +53,86 @@ export const ChessGame = () => {
   };
 
   const makeEngineMove = () => {
-    // Simplified engine move simulation
-    const engineMoves = ["e7-e5", "b8-c6", "g8-f6", "f8-c5"];
-    const randomMove = engineMoves[Math.floor(Math.random() * engineMoves.length)];
+    const possibleMoves = chess.moves();
     
-    const engineMove: ChessMove = {
-      from: randomMove.split("-")[0],
-      to: randomMove.split("-")[1],
-      piece: "pawn",
-      notation: randomMove,
-      timestamp: new Date()
-    };
+    if (possibleMoves.length === 0) {
+      toast({
+        title: "Game Over",
+        description: "No more moves available",
+      });
+      return;
+    }
     
-    setMoveHistory(prev => [...prev, engineMove]);
-    setCurrentPlayer("white");
+    // Simple random move selection based on difficulty
+    let selectedMove: string;
+    
+    if (difficulty === "easy") {
+      // Random move
+      selectedMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+    } else if (difficulty === "medium") {
+      // Prefer captures and center control
+      const captures = possibleMoves.filter(move => move.includes('x'));
+      const centerMoves = possibleMoves.filter(move => 
+        move.includes('e4') || move.includes('e5') || move.includes('d4') || move.includes('d5')
+      );
+      
+      if (captures.length > 0 && Math.random() > 0.5) {
+        selectedMove = captures[Math.floor(Math.random() * captures.length)];
+      } else if (centerMoves.length > 0 && Math.random() > 0.3) {
+        selectedMove = centerMoves[Math.floor(Math.random() * centerMoves.length)];
+      } else {
+        selectedMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+      }
+    } else {
+      // Hard: prefer checks, captures, and development
+      const checks = possibleMoves.filter(move => move.includes('+'));
+      const captures = possibleMoves.filter(move => move.includes('x'));
+      const development = possibleMoves.filter(move => 
+        move.startsWith('N') || move.startsWith('B') || move.includes('O-O')
+      );
+      
+      if (checks.length > 0) {
+        selectedMove = checks[Math.floor(Math.random() * checks.length)];
+      } else if (captures.length > 0 && Math.random() > 0.3) {
+        selectedMove = captures[Math.floor(Math.random() * captures.length)];
+      } else if (development.length > 0 && Math.random() > 0.4) {
+        selectedMove = development[Math.floor(Math.random() * development.length)];
+      } else {
+        selectedMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+      }
+    }
+    
+    setEngineMove(selectedMove);
     
     toast({
       title: "Engine Move",
-      description: `Engine played: ${randomMove}`,
+      description: `Engine played: ${selectedMove}`,
     });
   };
 
   const startNewGame = () => {
+    chess.reset();
     setMoveHistory([]);
     setCurrentPlayer("white");
     setGameStarted(true);
+    setEngineMove("");
     toast({
       title: "New Game",
       description: `Started ${gameMode} game${gameMode === "engine" ? ` on ${difficulty} difficulty` : ""}`,
     });
   };
 
+  // Reset engine move after it's been processed
+  useEffect(() => {
+    if (engineMove) {
+      const timer = setTimeout(() => setEngineMove(""), 100);
+      return () => clearTimeout(timer);
+    }
+  }, [engineMove]);
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Game Settings */}
         <div className="lg:col-span-1 space-y-6">
           <GameModeSelector
             gameMode={gameMode}
@@ -104,7 +151,6 @@ export const ChessGame = () => {
           <MoveHistory moves={moveHistory} />
         </div>
 
-        {/* Chess Board */}
         <div className="lg:col-span-2">
           <Card className="bg-slate-800/50 backdrop-blur-sm border-slate-700">
             <CardHeader>
@@ -130,6 +176,7 @@ export const ChessGame = () => {
                 gameStarted={gameStarted}
                 voiceCommand={isListening}
                 lastVoiceCommand={lastVoiceCommand}
+                engineMove={engineMove}
               />
             </CardContent>
           </Card>
