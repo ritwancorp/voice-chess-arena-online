@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { Chess } from 'chess.js';
+import { Chess, Square } from 'chess.js';
 import { ChessMove } from "./ChessGame";
 
 interface ChessBoardProps {
@@ -33,10 +33,10 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, l
   const [selectedSquare, setSelectedSquare] = useState<{ row: number; col: number } | null>(null);
   const [validMoves, setValidMoves] = useState<{ row: number; col: number }[]>([]);
 
-  const getSquareNotation = (row: number, col: number): string => {
+  const getSquareNotation = (row: number, col: number): Square => {
     const files = "abcdefgh";
     const ranks = "87654321";
-    return files[col] + ranks[row];
+    return (files[col] + ranks[row]) as Square;
   };
 
   const parseSquareNotation = (notation: string): { row: number; col: number } | null => {
@@ -100,8 +100,10 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, l
           move.to === trimmedCommand && move.piece === 'p'
         );
         if (possibleMoves.length > 0) {
-          chess.move(possibleMoves[0]);
-          moveAttempted = true;
+          const moveResult = chess.move(possibleMoves[0].san);
+          if (moveResult) {
+            moveAttempted = true;
+          }
         }
       }
       
@@ -122,9 +124,11 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, l
                 move.to === targetSquare && move.piece === symbol
               );
               if (possibleMoves.length > 0) {
-                chess.move(possibleMoves[0]);
-                moveAttempted = true;
-                break;
+                const moveResult = chess.move(possibleMoves[0].san);
+                if (moveResult) {
+                  moveAttempted = true;
+                  break;
+                }
               }
             }
           }
@@ -135,11 +139,13 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, l
       else {
         const matches = trimmedCommand.match(/([a-h][1-8]).*?([a-h][1-8])/);
         if (matches) {
-          const from = matches[1];
-          const to = matches[2];
+          const from = matches[1] as Square;
+          const to = matches[2] as Square;
           try {
-            chess.move({ from, to });
-            moveAttempted = true;
+            const moveResult = chess.move({ from, to });
+            if (moveResult) {
+              moveAttempted = true;
+            }
           } catch (e) {
             console.log("Invalid move:", from, "to", to);
           }
@@ -231,21 +237,20 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, l
     if (engineMove && gameStarted) {
       console.log("Executing engine move:", engineMove);
       try {
-        chess.move(engineMove);
-        updateBoardFromChess();
-        
-        const history = chess.history({ verbose: true });
-        const lastMove = history[history.length - 1];
-        
-        const move: ChessMove = {
-          from: lastMove.from,
-          to: lastMove.to,
-          piece: lastMove.piece,
-          notation: lastMove.san,
-          timestamp: new Date()
-        };
-        
-        onMove(move);
+        const moveResult = chess.move(engineMove);
+        if (moveResult) {
+          updateBoardFromChess();
+          
+          const move: ChessMove = {
+            from: moveResult.from,
+            to: moveResult.to,
+            piece: moveResult.piece,
+            notation: moveResult.san,
+            timestamp: new Date()
+          };
+          
+          onMove(move);
+        }
       } catch (error) {
         console.error("Error executing engine move:", error);
       }
@@ -306,8 +311,8 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, l
                   <span className={`
                     text-4xl md:text-6xl select-none font-bold
                     ${piece.color === "white" 
-                      ? "text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] filter brightness-110" 
-                      : "text-gray-800 drop-shadow-[0_1px_2px_rgba(255,255,255,0.3)] filter brightness-90"
+                      ? "text-gray-100 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" 
+                      : "text-gray-900 drop-shadow-[0_1px_2px_rgba(255,255,255,0.3)]"
                     }
                     hover:drop-shadow-[0_4px_8px_rgba(0,0,0,0.6)]
                   `}>
