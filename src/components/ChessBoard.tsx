@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Chess, Square } from 'chess.js';
 import { ChessMove } from "./ChessGame";
@@ -313,10 +312,13 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, l
                     text-4xl md:text-6xl select-none font-bold
                     ${piece.color === "white" 
                       ? "text-gray-100 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" 
-                      : "text-gray-900 drop-shadow-[0_1px_2px_rgba(255,255,255,0.3)]"
+                      : "text-gray-800 drop-shadow-[0_2px_2px_rgba(255,255,255,0.4)] stroke-white"
                     }
                     hover:drop-shadow-[0_4px_8px_rgba(0,0,0,0.6)]
-                  `}>
+                  `}
+                  style={piece.color === "black" ? {
+                    textShadow: "1px 1px 0 white, -1px -1px 0 white, 1px -1px 0 white, -1px 1px 0 white"
+                  } : {}}>
                     {piece.symbol}
                   </span>
                   <div className={`

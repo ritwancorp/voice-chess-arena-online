@@ -29,6 +29,7 @@ export const ChessGame = () => {
   const [lastVoiceCommand, setLastVoiceCommand] = useState<string>("");
   const [engineMove, setEngineMove] = useState<string>("");
   const [chess] = useState(new Chess());
+  const [boardKey, setBoardKey] = useState(0); // Add key to force board reset
   const { toast } = useToast();
 
   const handleVoiceMove = (move: string) => {
@@ -117,6 +118,8 @@ export const ChessGame = () => {
     setCurrentPlayer("white");
     setGameStarted(true);
     setEngineMove("");
+    setLastVoiceCommand("");
+    setBoardKey(prev => prev + 1); // Force board component to reset
     toast({
       title: "New Game",
       description: `Started ${gameMode} game${gameMode === "engine" ? ` on ${difficulty} difficulty` : ""}`,
@@ -172,6 +175,7 @@ export const ChessGame = () => {
             </CardHeader>
             <CardContent>
               <ChessBoard
+                key={boardKey}
                 currentPlayer={currentPlayer}
                 onMove={handleMove}
                 gameStarted={gameStarted}
