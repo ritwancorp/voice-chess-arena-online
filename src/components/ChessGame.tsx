@@ -44,7 +44,7 @@ export const ChessGame = () => {
     setMoveHistory(prev => [...prev, move]);
     setCurrentPlayer(prev => prev === "white" ? "black" : "white");
     
-    // If playing against engine and it's engine's turn (black)
+    // If playing against engine and it's now engine's turn (black)
     if (gameMode === "engine" && currentPlayer === "white") {
       setTimeout(() => {
         makeEngineMove();
@@ -102,6 +102,7 @@ export const ChessGame = () => {
       }
     }
     
+    console.log("Engine attempting move:", selectedMove, "from available moves:", possibleMoves);
     setEngineMove(selectedMove);
     
     toast({
@@ -177,6 +178,7 @@ export const ChessGame = () => {
                 voiceCommand={isListening}
                 lastVoiceCommand={lastVoiceCommand}
                 engineMove={engineMove}
+                chessInstance={chess}
               />
             </CardContent>
           </Card>

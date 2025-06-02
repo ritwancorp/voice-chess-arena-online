@@ -10,6 +10,7 @@ interface ChessBoardProps {
   voiceCommand: boolean;
   lastVoiceCommand?: string;
   engineMove?: string;
+  chessInstance: Chess;
 }
 
 interface ChessPiece {
@@ -27,8 +28,7 @@ const pieceSymbols: { [key: string]: { white: string; black: string } } = {
   'k': { white: '♔', black: '♚' }
 };
 
-export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, lastVoiceCommand, engineMove }: ChessBoardProps) => {
-  const [chess] = useState(new Chess());
+export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, lastVoiceCommand, engineMove, chessInstance }: ChessBoardProps) => {
   const [board, setBoard] = useState<(ChessPiece | null)[][]>([]);
   const [selectedSquare, setSelectedSquare] = useState<{ row: number; col: number } | null>(null);
   const [validMoves, setValidMoves] = useState<{ row: number; col: number }[]>([]);
@@ -55,7 +55,7 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, l
     for (let row = 0; row < 8; row++) {
       for (let col = 0; col < 8; col++) {
         const square = getSquareNotation(row, col);
-        const piece = chess.get(square);
+        const piece = chessInstance.get(square);
         
         if (piece) {
           newBoard[row][col] = {
@@ -76,7 +76,7 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, l
 
   const calculateValidMoves = (row: number, col: number): { row: number; col: number }[] => {
     const square = getSquareNotation(row, col);
-    const moves = chess.moves({ square, verbose: true });
+    const moves = chessInstance.moves({ square, verbose: true });
     
     return moves.map(move => {
       const toPos = parseSquareNotation(move.to);
@@ -96,11 +96,11 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, l
       // Try simple algebraic notation first (e4, Nf3, etc.)
       if (/^[a-h][1-8]$/.test(trimmedCommand)) {
         // Pawn move
-        const possibleMoves = chess.moves({ verbose: true }).filter(move => 
+        const possibleMoves = chessInstance.moves({ verbose: true }).filter(move => 
           move.to === trimmedCommand && move.piece === 'p'
         );
         if (possibleMoves.length > 0) {
-          const moveResult = chess.move(possibleMoves[0].san);
+          const moveResult = chessInstance.move(possibleMoves[0].san);
           if (moveResult) {
             moveAttempted = true;
           }
@@ -120,11 +120,11 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, l
             const squareMatch = trimmedCommand.match(/[a-h][1-8]/);
             if (squareMatch) {
               const targetSquare = squareMatch[0];
-              const possibleMoves = chess.moves({ verbose: true }).filter(move => 
+              const possibleMoves = chessInstance.moves({ verbose: true }).filter(move => 
                 move.to === targetSquare && move.piece === symbol
               );
               if (possibleMoves.length > 0) {
-                const moveResult = chess.move(possibleMoves[0].san);
+                const moveResult = chessInstance.move(possibleMoves[0].san);
                 if (moveResult) {
                   moveAttempted = true;
                   break;
@@ -142,7 +142,7 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, l
           const from = matches[1] as Square;
           const to = matches[2] as Square;
           try {
-            const moveResult = chess.move({ from, to });
+            const moveResult = chessInstance.move({ from, to });
             if (moveResult) {
               moveAttempted = true;
             }
@@ -153,7 +153,7 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, l
       }
       
       if (moveAttempted) {
-        const history = chess.history({ verbose: true });
+        const history = chessInstance.history({ verbose: true });
         const lastMove = history[history.length - 1];
         
         updateBoardFromChess();
@@ -183,7 +183,7 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, l
     const to = getSquareNotation(toRow, toCol);
     
     try {
-      const moveResult = chess.move({ from, to });
+      const moveResult = chessInstance.move({ from, to });
       
       if (moveResult) {
         updateBoardFromChess();
@@ -237,7 +237,7 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, l
     if (engineMove && gameStarted) {
       console.log("Executing engine move:", engineMove);
       try {
-        const moveResult = chess.move(engineMove);
+        const moveResult = chessInstance.move(engineMove);
         if (moveResult) {
           updateBoardFromChess();
           
@@ -250,6 +250,7 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, l
           };
           
           onMove(move);
+          console.log("Engine move executed successfully:", move);
         }
       } catch (error) {
         console.error("Error executing engine move:", error);
@@ -282,7 +283,7 @@ export const ChessBoard = ({ currentPlayer, onMove, gameStarted, voiceCommand, l
 
   useEffect(() => {
     if (!gameStarted) {
-      chess.reset();
+      chessInstance.reset();
     }
     updateBoardFromChess();
   }, [gameStarted]);
